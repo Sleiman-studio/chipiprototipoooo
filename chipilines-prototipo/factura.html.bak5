@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tu factura - Chipilines Venezuela</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Pacifico&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { rosa: '#E8B4C8', cielo: '#A8D8EA', oro: '#D4AF37', crema: '#FDF8F5', tinta: '#2D2A32' },
+    fontFamily: { sans: ['Quicksand','sans-serif'], display: ['Pacifico','cursive'], script: ['Dancing Script','cursive'] }
+  }}}
+</script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-crema min-h-screen">
+
+<nav class="navbar fixed top-0 left-0 right-0 z-50">
+  <div class="max-w-7xl mx-auto px-5 md:px-8 h-20 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-full bg-gradient-to-br from-rosa to-cielo flex items-center justify-center shadow-md"><span class="font-display text-white text-lg">C</span></div>
+      <div class="leading-none"><p class="font-bold text-lg tracking-tight">Chipilines</p><p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Venezuela</p></div>
+    </a>
+    <a href="catalogo.html" class="text-sm font-semibold text-gray-500 hover:text-tinta transition">Catalogo</a>
+  </div>
+</nav>
+
+<header class="pt-32 pb-8 px-5 md:px-8 max-w-4xl mx-auto reveal text-center">
+  <p class="font-script text-3xl text-rosa mb-2">Tu cotizacion</p>
+  <h1 class="font-display text-4xl md:text-5xl text-tinta mb-2">Revisa y confirma</h1>
+  <p class="text-gray-500">Verifica los detalles de tu pedido. Si todo esta bien, procede con la compra.</p>
+</header>
+
+<main class="px-5 md:px-8 max-w-4xl mx-auto pb-24">
+  <div id="factura-contenido" class="reveal"></div>
+</main>
+
+<footer class="bg-tinta text-white/60 py-8 text-center text-xs">(c) 2024 Chipilines Venezuela - Prototipo demostrativo</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="js/app.js"></script>
+<script src="js/factura.js"></script>
+</body>
+</html>

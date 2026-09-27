@@ -1,0 +1,316 @@
+
+const CONFIG = {
+  whatsapp: '584128048173',        // <-- Numero de prueba: 04128048173
+  empresa: 'Chipilines Venezuela',
+  adminPassword: 'chipilines2024'
+};
+
+const PRODUCTOS_DEFAULT = [
+  { id: 1,  nombre: 'Placa de Nombre Acrilico',        categoria: 'placas',       descripcion: 'Nombre personalizado en acrilico con detalles decorativos.',                imagen: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&q=80' },
+  { id: 2,  nombre: 'Cuadro Decorativo Personalizado', categoria: 'cuadros',      descripcion: 'Cuadro con el nombre y significado, ideal para el cuarto del bebe.',       imagen: 'https://images.unsplash.com/photo-1611048267451-e6ed903d4a38?w=800&q=80' },
+  { id: 3,  nombre: 'Adhesivo Vinilico Espacial',      categoria: 'adhesivos',    descripcion: 'Set de cohetes, planetas y estrellas para pared.',                          imagen: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&q=80' },
+  { id: 4,  nombre: 'Papel Tapiz Vinilico',            categoria: 'papel-tapiz',  descripcion: 'Disenos exclusivos con acabado premium y facil instalacion.',               imagen: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80' },
+  { id: 5,  nombre: 'Nombre en Acrilico con Luces',    categoria: 'nombres',      descripcion: 'Letras iluminadas con LED para un efecto magico.',                          imagen: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=800&q=80' },
+  { id: 6,  nombre: 'Habitacion Tematica Completa',    categoria: 'habitaciones', descripcion: 'Diseno integral: mural, nombres, adhesivos y decoracion.',                 imagen: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&q=80' },
+  { id: 7,  nombre: 'Placa Nubes y Estrellas',         categoria: 'placas',       descripcion: 'Placa colgante con nubes, estrellas y nombre del pequenin.',                imagen: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=800&q=80' },
+  { id: 8,  nombre: 'Cuadro Significado del Nombre',   categoria: 'cuadros',      descripcion: 'Diseno con tipografia elegante y explicacion del nombre.',                  imagen: 'https://images.unsplash.com/photo-1558997519-83ea9252edf8?w=800&q=80' },
+  { id: 9,  nombre: 'Adhesivo Marino',                 categoria: 'adhesivos',    descripcion: 'Peces, burbujas y olas para un cuarto con onda.',                            imagen: 'https://images.unsplash.com/photo-1615874959474-d609969a20ed?w=800&q=80' },
+  { id: 10, nombre: 'Vinil para Puerta',               categoria: 'adhesivos',    descripcion: 'Personaliza la puerta con el nombre o una frase especial.',                 imagen: 'https://images.unsplash.com/photo-1616627561950-9f746e330187?w=800&q=80' },
+  { id: 11, nombre: 'Nombre Gigante con Flores',       categoria: 'nombres',      descripcion: 'Nombre en acrilico con detalles florales y brillo.',                        imagen: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80' },
+  { id: 12, nombre: 'Mural Decorativo Infantil',       categoria: 'cuadros',      descripcion: 'Mural tematico adaptado al estilo de la habitacion.',                       imagen: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&q=80' }
+];
+
+const CATEGORIAS_DEFAULT = [
+  { id: 'placas', label: 'Placas' },
+  { id: 'cuadros', label: 'Cuadros' },
+  { id: 'adhesivos', label: 'Adhesivos' },
+  { id: 'papel-tapiz', label: 'Papel Tapiz' },
+  { id: 'nombres', label: 'Nombres' },
+  { id: 'habitaciones', label: 'Habitaciones' }
+];
+
+function getCategorias() {
+  const raw = localStorage.getItem('chipilines_categorias');
+  if (raw) {
+    try { return JSON.parse(raw); } catch(e) {}
+  }
+  localStorage.setItem('chipilines_categorias', JSON.stringify(CATEGORIAS_DEFAULT));
+  return CATEGORIAS_DEFAULT;
+}
+function saveCategorias(c) {
+  localStorage.setItem('chipilines_categorias', JSON.stringify(c));
+}
+function getCategoriasConTodos() {
+  return [{ id: 'todos', label: 'Todos' }].concat(getCategorias());
+}
+function etiquetaCategoria(id) {
+  const cat = getCategorias().find(x => x.id === id);
+  return cat ? cat.label : id;
+}
+
+// Alias para compatibilidad con codigo viejo
+Object.defineProperty(window, 'CATEGORIAS', {
+  get: function() { return getCategoriasConTodos(); }
+});
+
+/* Helpers */
+function getProductos() {
+  const raw = localStorage.getItem('chipilines_productos');
+  if (raw) return JSON.parse(raw);
+  localStorage.setItem('chipilines_productos', JSON.stringify(PRODUCTOS_DEFAULT));
+  return PRODUCTOS_DEFAULT;
+}
+function saveProductos(p) { localStorage.setItem('chipilines_productos', JSON.stringify(p)); }
+function getCarrito() { return JSON.parse(localStorage.getItem('chipilines_carrito') || '[]'); }
+function saveCarrito(c) { localStorage.setItem('chipilines_carrito', JSON.stringify(c)); actualizarBadge(); }
+function getPedidos() { return JSON.parse(localStorage.getItem('chipilines_pedidos') || '[]'); }
+function savePedidos(p) { localStorage.setItem('chipilines_pedidos', JSON.stringify(p)); }
+
+function actualizarBadge() {
+  const total = getCarrito().reduce((s, i) => s + (i.cantidad || 1), 0);
+  document.querySelectorAll('.cart-count').forEach(el => {
+    el.textContent = total;
+    el.style.display = total > 0 ? 'flex' : 'none';
+  });
+}
+
+function mostrarToast(msg, tipo = 'ok') {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast'; toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.background = tipo === 'error' ? '#c0392b' : '#2D2A32';
+  toast.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+function agregarAlCarrito(id) {
+  const producto = getProductos().find(p => p.id === id);
+  if (!producto) return;
+  const carrito = getCarrito();
+  const existente = carrito.find(i => i.id === id);
+  if (existente) existente.cantidad = (existente.cantidad || 1) + 1;
+  else carrito.push({ ...producto, cantidad: 1 });
+  saveCarrito(carrito);
+  mostrarToast('"' + producto.nombre + '" anadido a tu cotizacion');
+  animarCarritoFlotante();
+}
+
+function animarCarritoFlotante() {
+  const btn = document.querySelector('.cart-float');
+  if (!btn) return;
+  btn.classList.add('pulse-ring');
+  setTimeout(() => btn.classList.remove('pulse-ring'), 1200);
+}
+
+function activarFallbackImagenes() {
+  document.querySelectorAll('img[data-fallback]').forEach(img => {
+    img.addEventListener('error', () => {
+      const parent = img.parentElement;
+      img.style.display = 'none';
+      if (parent && !parent.classList.contains('img-fallback')) parent.classList.add('img-fallback');
+    });
+  });
+}
+
+function renderCatalogo(containerId, filtro = 'todos') {
+  const cont = document.getElementById(containerId);
+  if (!cont) return;
+  const productos = getProductos().filter(p => filtro === 'todos' || p.categoria === filtro);
+  if (productos.length === 0) {
+    cont.innerHTML = '<div class="col-span-full empty-state"><p class="text-5xl mb-3">~</p><p>No hay productos en esta categoria todavia.</p></div>';
+    return;
+  }
+  cont.innerHTML = productos.map(p => `
+    <article class="producto-card reveal shadow-sm">
+      <div class="relative h-64 overflow-hidden bg-gray-100">
+        ${p.video ? (videoEmbedUrl(p.video) ?
+          (esVideoDirecto(p.video) ?
+            '<video class="producto-img" controls muted playsinline><source src="' + p.video + '"></video>' :
+            '<iframe class="producto-img" src="' + videoEmbedUrl(p.video) + '" allow="accelerometer; autoplay; clipboard-write; encrypted-media" allowfullscreen></iframe>')
+          : '<img src="' + p.imagen + '" alt="' + p.nombre + '" data-fallback class="producto-img" loading="lazy">')
+        : '<img src="' + p.imagen + '" alt="' + p.nombre + '" data-fallback class="producto-img" loading="lazy">'}
+        <span class="absolute top-3 left-3 bg-white/90 backdrop-blur text-[11px] font-semibold uppercase tracking-wider px-3 py-1 rounded-full z-10">${etiquetaCategoria(p.categoria)}</span>
+      </div>
+      <div class="p-5">
+        <h3 class="font-bold text-lg leading-tight mb-1">${p.nombre}</h3>
+        <p class="text-sm text-gray-500 leading-snug mb-4">${p.descripcion}</p>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Precio a cotizar</span>
+          <button onclick="agregarAlCarrito(${p.id})" class="btn-primary text-sm font-bold px-4 py-2 rounded-full">+ Cotizar</button>
+        </div>
+      </div>
+    </article>`).join('');
+  activarFallbackImagenes();
+  activarReveal();
+}
+
+function etiquetaCategoria(id) {
+  const c = CATEGORIAS.find(x => x.id === id);
+  return c ? c.label : id;
+}
+
+function renderCarrito() {
+  const cont = document.getElementById('lista-carrito');
+  if (!cont) return;
+  const carrito = getCarrito();
+  if (carrito.length === 0) {
+    cont.innerHTML = `
+      <div class="empty-state">
+        <p class="text-6xl mb-4">~</p>
+        <p class="text-lg font-semibold mb-1">Tu cotizacion esta vacia</p>
+        <p class="text-sm mb-6">Explora el catalogo y anade los productos que te gustaria cotizar.</p>
+        <a href="catalogo.html" class="btn-primary inline-block font-bold px-6 py-3 rounded-full">Ver catalogo</a>
+      </div>`;
+    actualizarResumen(); return;
+  }
+  cont.innerHTML = carrito.map(item => `
+    <div class="flex gap-4 bg-white rounded-2xl p-4 shadow-sm items-center">
+      <div class="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+        <img src="${item.imagen}" alt="${item.nombre}" data-fallback class="producto-img">
+      </div>
+      <div class="flex-1 min-w-0">
+        <h4 class="font-bold text-sm leading-tight mb-1">${item.nombre}</h4>
+        <p class="text-xs text-gray-400 uppercase tracking-wider mb-2">${etiquetaCategoria(item.categoria)}</p>
+        <div class="flex items-center gap-3">
+          <button onclick="cambiarCantidad(${item.id}, -1)" class="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50">-</button>
+          <span class="font-bold text-sm w-6 text-center">${item.cantidad}</span>
+          <button onclick="cambiarCantidad(${item.id}, 1)" class="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50">+</button>
+        </div>
+      </div>
+      <button onclick="eliminarDelCarrito(${item.id})" class="text-gray-300 hover:text-red-500 transition p-2" title="Eliminar">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>`).join('');
+  activarFallbackImagenes();
+  actualizarResumen();
+}
+
+function cambiarCantidad(id, delta) {
+  const carrito = getCarrito();
+  const item = carrito.find(i => i.id === id);
+  if (!item) return;
+  item.cantidad = Math.max(1, (item.cantidad || 1) + delta);
+  saveCarrito(carrito); renderCarrito();
+}
+
+function eliminarDelCarrito(id) {
+  saveCarrito(getCarrito().filter(i => i.id !== id));
+  renderCarrito();
+  mostrarToast('Producto eliminado');
+}
+
+function actualizarResumen() {
+  const carrito = getCarrito();
+  const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0);
+  const el = document.getElementById('total-items');
+  if (el) el.textContent = totalItems;
+}
+
+/* ---------- NUEVO: Enviar cotizacion ---------- */
+function enviarCotizacion(e) {
+  e.preventDefault();
+  const carrito = getCarrito();
+  if (carrito.length === 0) { mostrarToast('Tu cotizacion esta vacia', 'error'); return; }
+
+  const nombre    = document.getElementById('cli-nombre').value.trim();
+  const cedula    = document.getElementById('cli-cedula').value.trim();
+  const telefono  = document.getElementById('cli-telefono').value.trim();
+  const evento    = document.getElementById('cli-evento').value.trim();
+  const notas     = document.getElementById('cli-notas').value.trim();
+
+  if (!nombre || !cedula || !telefono) { mostrarToast('Completa nombre, cedula y telefono', 'error'); return; }
+
+  const pedido = {
+    id: 'COT-' + Date.now(),
+    fecha: new Date().toISOString(),
+    cliente: { nombre, cedula, telefono, evento, notas },
+    items: carrito.map(i => ({ ...i, precioUnitario: 0 })),
+    estado: 'pendiente',
+    total: 0
+  };
+  const pedidos = getPedidos();
+  pedidos.unshift(pedido);
+  savePedidos(pedidos);
+
+  const totalItems = carrito.reduce((s, i) => s + i.cantidad, 0);
+  let msg = 'Hola ' + CONFIG.empresa + '!%0A%0A';
+  msg += 'He pedido *' + totalItems + ' producto' + (totalItems > 1 ? 's' : '') + '* y me gustaria cotizar%0A%0A';
+  msg += '*Detalle:*%0A';
+  carrito.forEach((i, idx) => { msg += (idx + 1) + '. ' + i.nombre + ' (x' + i.cantidad + ')%0A'; });
+  msg += '%0A*Mis datos:*%0A';
+  msg += '*Nombre:* ' + nombre + '%0A';
+  msg += '*Cedula:* ' + cedula + '%0A';
+  msg += '*Telefono:* ' + telefono + '%0A';
+  if (evento) msg += '*Fecha del evento:* ' + evento + '%0A';
+  if (notas) msg += '%0A*Notas:*%0A' + notas + '%0A';
+  msg += '%0AQuedo atento(a) para coordinar. Gracias!';
+
+  window.open('https://wa.me/' + CONFIG.whatsapp + '?text=' + msg, '_blank');
+  saveCarrito([]);
+  mostrarToast('Cotizacion enviada! Te contactaremos pronto');
+  setTimeout(() => { window.location.href = 'catalogo.html'; }, 1800);
+}
+
+/* ---------- Encoding helpers para factura ---------- */
+function b64encode(obj) {
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); }
+  catch(e) { return ''; }
+}
+function b64decode(str) {
+  try { return JSON.parse(decodeURIComponent(escape(atob(str)))); }
+  catch(e) { return null; }
+}
+
+function activarReveal() {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal:not(.visible)').forEach(el => io.observe(el));
+}
+
+/* ---------- Normalizar telefono venezolano ---------- */
+function normalizarTelefonoVE(tel) {
+  let t = String(tel || '').replace(/[^0-9]/g, '');
+  if (!t) return '';
+  if (t.startsWith('0')) t = t.slice(1);
+  if (!t.startsWith('58')) t = '58' + t;
+  return t;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const nav = document.querySelector('.navbar');
+  if (nav) {
+    const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
+    window.addEventListener('scroll', onScroll); onScroll();
+  }
+  actualizarBadge();
+  activarReveal();
+  activarFallbackImagenes();
+});
+
+
+/* ---------- Helper: convertir URL de video a embed ---------- */
+function videoEmbedUrl(url) {
+  if (!url) return '';
+  url = url.trim();
+  // YouTube
+  let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  if (m) return 'https://www.youtube.com/embed/' + m[1];
+  // Vimeo
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return 'https://player.vimeo.com/video/' + m[1];
+  // Google Drive
+  m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (m) return 'https://drive.google.com/file/d/' + m[1] + '/preview';
+  // Directo (mp4, webm)
+  if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(url)) return url;
+  return '';
+}
+function esVideoDirecto(url) {
+  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(url || '');
+}

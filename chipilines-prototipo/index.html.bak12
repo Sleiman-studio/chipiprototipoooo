@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chipilines Venezuela - Decoracion Infantil Personalizada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Pacifico&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { theme: { extend: {
+    colors: { rosa: '#E8B4C8', cielo: '#A8D8EA', oro: '#D4AF37', crema: '#FDF8F5', tinta: '#2D2A32' },
+    fontFamily: { sans: ['Quicksand','sans-serif'], display: ['Pacifico','cursive'], script: ['Dancing Script','cursive'] }
+  }}}
+</script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-crema">
+
+<nav class="navbar fixed top-0 left-0 right-0 z-50">
+  <div class="max-w-7xl mx-auto px-5 md:px-8 h-20 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-full bg-gradient-to-br from-rosa to-cielo flex items-center justify-center shadow-md"><span class="font-display text-white text-lg">C</span></div>
+      <div class="leading-none"><p class="font-bold text-lg tracking-tight">Chipilines</p><p class="text-[10px] uppercase tracking-[0.25em] text-gray-500">Venezuela</p></div>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm font-semibold">
+      <a href="index.html" class="text-tinta">Inicio</a>
+      <a href="catalogo.html" class="text-gray-500 hover:text-tinta transition">Catalogo</a>
+      <a href="#como" class="text-gray-500 hover:text-tinta transition">Como cotizar?</a>
+      <a href="admin.html" class="text-gray-500 hover:text-tinta transition">Admin</a>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="carrito.html" class="relative w-11 h-11 rounded-full bg-white shadow-sm flex items-center justify-center hover:shadow-md transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        <span class="cart-badge cart-count" style="display:none">0</span>
+      </a>
+      <a href="catalogo.html" class="btn-primary hidden sm:inline-block text-sm font-bold px-5 py-2.5 rounded-full">Cotizar</a>
+    </div>
+  </div>
+</nav>
+
+<header class="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+  <div class="hero-blob blob-1"></div>
+  <div class="hero-blob blob-2"></div>
+  <div class="relative max-w-7xl mx-auto px-5 md:px-8 grid md:grid-cols-2 gap-12 items-center">
+    <div class="reveal">
+      <span class="inline-flex items-center gap-2 bg-white/80 backdrop-blur text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full shadow-sm mb-6"><span class="w-2 h-2 rounded-full bg-rosa"></span> #1 en decoracion infantil</span>
+      <h1 id="hero-titulo" class="font-display text-5xl md:text-6xl lg:text-7xl leading-tight text-tinta mb-6">Creamos espacios <span class="text-rosa">magicos</span> para tu bebe</h1>
+      <p id="hero-subtitulo" class="text-lg text-gray-600 leading-relaxed mb-8 max-w-lg">Nombres en acrilico, cuadros, adhesivos y papel tapiz disenados con amor para que cada habitacion cuente su propia historia.</p>
+      <div class="flex flex-wrap gap-3">
+        <a href="catalogo.html" class="btn-primary font-bold px-7 py-3.5 rounded-full inline-flex items-center gap-2">Ver catalogo
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+        <a href="#como" class="bg-white font-bold px-7 py-3.5 rounded-full shadow-sm hover:shadow-md transition">Como funciona?</a>
+      </div>
+      <div class="flex items-center gap-6 mt-10">
+        <div><p class="font-bold text-2xl">+500</p><p class="text-xs text-gray-500 uppercase tracking-wider">Habitaciones</p></div>
+        <div class="w-px h-10 bg-gray-200"></div>
+        <div><p class="font-bold text-2xl">100%</p><p class="text-xs text-gray-500 uppercase tracking-wider">Personalizado</p></div>
+        <div class="w-px h-10 bg-gray-200"></div>
+        <div><p class="font-bold text-2xl">5 Estrellas</p><p class="text-xs text-gray-500 uppercase tracking-wider">Clientes felices</p></div>
+      </div>
+    </div>
+    <div class="relative reveal">
+      <div class="animate-float relative rounded-[2.5rem] overflow-hidden shadow-2xl bg-white p-3">
+        <img id="hero-imagen" src="https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=900&q=80" alt="Habitacion decorada" class="rounded-[2rem] w-full h-[480px] object-cover" data-fallback>
+      </div>
+      <div class="absolute -bottom-5 -left-5 bg-white rounded-2xl shadow-xl p-4 flex items-center gap-3 animate-float" style="animation-delay:1s">
+        <div class="w-10 h-10 rounded-full bg-rosa/20 flex items-center justify-center">*</div>
+        <div><p class="font-bold text-sm">Diseno exclusivo</p><p class="text-xs text-gray-500">Hecho a tu medida</p></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-5 md:px-8">
+    <div class="text-center max-w-2xl mx-auto mb-14 reveal">
+      <p class="font-script text-3xl text-rosa mb-2">Nuestros servicios</p>
+      <h2 class="font-display text-4xl md:text-5xl text-tinta mb-4">Todo para su mundo</h2>
+      <p class="text-gray-500">Cada pieza es disenada y fabricada pensando en la magia de la infancia.</p>
+    </div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="reveal bg-crema rounded-3xl p-7 hover:shadow-xl transition-shadow"><div class="w-14 h-14 rounded-2xl bg-rosa/20 flex items-center justify-center text-2xl mb-5">*</div><h3 class="font-bold text-lg mb-2">Nombres acrilicos</h3><p class="text-sm text-gray-500 leading-relaxed">Letras con acabados premium, brillos y detalles unicos.</p></div>
+      <div class="reveal bg-crema rounded-3xl p-7 hover:shadow-xl transition-shadow"><div class="w-14 h-14 rounded-2xl bg-cielo/30 flex items-center justify-center text-2xl mb-5">#</div><h3 class="font-bold text-lg mb-2">Cuadros decorativos</h3><p class="text-sm text-gray-500 leading-relaxed">Con el significado del nombre y diseno personalizado.</p></div>
+      <div class="reveal bg-crema rounded-3xl p-7 hover:shadow-xl transition-shadow"><div class="w-14 h-14 rounded-2xl bg-oro/20 flex items-center justify-center text-2xl mb-5">+</div><h3 class="font-bold text-lg mb-2">Adhesivos vinilicos</h3><p class="text-sm text-gray-500 leading-relaxed">Tematicas espaciales, marinas, animales y mas.</p></div>
+      <div class="reveal bg-crema rounded-3xl p-7 hover:shadow-xl transition-shadow"><div class="w-14 h-14 rounded-2xl bg-rosa/20 flex items-center justify-center text-2xl mb-5">@</div><h3 class="font-bold text-lg mb-2">Habitaciones completas</h3><p class="text-sm text-gray-500 leading-relaxed">Diseno integral: mural, papel tapiz y decoracion.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="como" class="py-20">
+  <div class="max-w-7xl mx-auto px-5 md:px-8">
+    <div class="text-center max-w-2xl mx-auto mb-14 reveal">
+      <p class="font-script text-3xl text-rosa mb-2">Asi de facil</p>
+      <h2 class="font-display text-4xl md:text-5xl text-tinta mb-4">Cotiza en 3 pasos</h2>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="reveal text-center"><div class="w-20 h-20 mx-auto rounded-full bg-tinta text-white font-display text-3xl flex items-center justify-center mb-5">1</div><h3 class="font-bold text-xl mb-2">Elige tus productos</h3><p class="text-sm text-gray-500 max-w-xs mx-auto">Explora el catalogo y anade a tu cotizacion lo que mas te guste.</p></div>
+      <div class="reveal text-center"><div class="w-20 h-20 mx-auto rounded-full bg-rosa text-white font-display text-3xl flex items-center justify-center mb-5">2</div><h3 class="font-bold text-xl mb-2">Completa tus datos</h3><p class="text-sm text-gray-500 max-w-xs mx-auto">Nombre, cedula y telefono. Todo seguro, sin pagos online.</p></div>
+      <div class="reveal text-center"><div class="w-20 h-20 mx-auto rounded-full bg-cielo text-white font-display text-3xl flex items-center justify-center mb-5">3</div><h3 class="font-bold text-xl mb-2">Te contactamos</h3><p class="text-sm text-gray-500 max-w-xs mx-auto">Recibimos tu pedido por WhatsApp y coordinamos tu cotizacion personalizada.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="py-20">
+  <div class="max-w-6xl mx-auto px-5 md:px-8">
+    <div class="relative rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-rosa to-cielo p-10 md:p-16 text-center reveal">
+      <div class="relative z-10">
+        <h2 class="font-display text-4xl md:text-5xl text-white mb-4">Listos para empezar?</h2>
+        <p class="text-white/90 max-w-lg mx-auto mb-8">Cada habitacion merece una historia unica. Cuentanos tu idea y la hacemos realidad.</p>
+        <a href="catalogo.html" class="inline-block bg-white text-tinta font-bold px-8 py-4 rounded-full shadow-xl hover:scale-105 transition-transform">Explorar catalogo</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="bg-tinta text-white/80 pt-16 pb-8">
+  <div class="max-w-7xl mx-auto px-5 md:px-8 grid md:grid-cols-3 gap-10 mb-10">
+    <div><p class="font-display text-2xl text-white mb-3">Chipilines</p><p class="text-sm leading-relaxed max-w-xs">Decoracion infantil personalizada. Creamos espacios magicos para los mas pequenos de la casa.</p></div>
+    <div><p class="font-bold text-white mb-4 uppercase text-xs tracking-widest">Explora</p>
+      <ul class="space-y-2 text-sm">
+        <li><a href="index.html" class="hover:text-rosa transition">Inicio</a></li>
+        <li><a href="catalogo.html" class="hover:text-rosa transition">Catalogo</a></li>
+        <li><a href="carrito.html" class="hover:text-rosa transition">Mi cotizacion</a></li>
+        <li><a href="admin.html" class="hover:text-rosa transition">Administrador</a></li>
+      </ul>
+    </div>
+    <div><p class="font-bold text-white mb-4 uppercase text-xs tracking-widest">Contacto</p><p class="text-sm">Los palos grandes - Venezuela</p><p class="text-sm">WhatsApp: +58 412-8048173</p></div>
+  </div>
+  <div class="border-t border-white/10 pt-6 text-center text-xs text-white/40">(c) 2024 Chipilines Venezuela. Prototipo demostrativo.</div>
+</footer>
+
+<a href="carrito.html" class="cart-float">
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+  <span class="cart-badge cart-count" style="display:none">0</span>
+</a>
+
+<script src="js/app.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const esPreview = params.get('preview') === '1';
+    const key = esPreview ? 'chipilines_home_preview' : 'chipilines_home';
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      try {
+        const d = JSON.parse(raw);
+        if (d.heroTitulo) document.getElementById('hero-titulo').textContent = d.heroTitulo;
+        if (d.heroSubtitulo) document.getElementById('hero-subtitulo').textContent = d.heroSubtitulo;
+        if (d.heroImagen) document.getElementById('hero-imagen').src = d.heroImagen;
+      } catch(e) {}
+    }
+
+    // Banner si es preview
+    if (esPreview) {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:88px;left:50%;transform:translateX(-50%);z-index:9999;background:#2D2A32;color:#fff;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);display:flex;align-items:center;gap:12px;';
+      banner.innerHTML = '<span>Vista previa - Aun no guardado</span>' +
+                        '<button onclick="window.close()" style="background:#E8B4C8;color:#fff;border:none;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;">Cerrar</button>';
+      document.body.appendChild(banner);
+    }
+  });
+</script>
+</body>
+</html>

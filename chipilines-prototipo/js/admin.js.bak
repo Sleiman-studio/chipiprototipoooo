@@ -1,0 +1,307 @@
+
+const ADMIN_PASSWORD = 'chipilines2024';
+
+/* ---------- Datos de pago (Venezuela) ---------- */
+const DATOS_PAGO = {
+  pagoMovil: {
+    banco: 'Banesco',
+    telefono: '0412-8048173',
+    cedula: 'V-12345678',
+    titular: 'Chipilines Venezuela'
+  },
+  transferencia: {
+    banco: 'Banesco',
+    cuenta: '0134-XXXX-XX-XXXXXXXXXX',
+    titular: 'Chipilines Venezuela',
+    rif: 'J-XXXXXXXX-X'
+  },
+  zelle: {
+    email: 'pagos@chipilines.com',
+    titular: 'Chipilines Venezuela'
+  },
+  binance: {
+    email: 'pagos@chipilines.com',
+    red: 'TRC20 (USDT)'
+  },
+  paypal: {
+    email: 'pagos@chipilines.com'
+  },
+  efectivo: {
+    nota: 'Coordinar punto de encuentro en Los Palos Grandes, Caracas.'
+  }
+};
+
+function estaLogueado() { return sessionStorage.getItem('chipilines_admin') === 'ok'; }
+
+function loginAdmin(e) {
+  e.preventDefault();
+  const pass = document.getElementById('admin-pass').value;
+  if (pass === ADMIN_PASSWORD) {
+    sessionStorage.setItem('chipilines_admin', 'ok');
+    document.getElementById('login-overlay').style.display = 'none';
+    iniciarAdmin();
+  } else { mostrarToast('Contrasena incorrecta', 'error'); }
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem('chipilines_admin');
+  location.reload();
+}
+
+function iniciarAdmin() {
+  renderStats(); renderPedidos(); renderProductosAdmin();
+}
+
+function renderStats() {
+  const pedidos = getPedidos();
+  document.getElementById('stat-total').textContent = pedidos.length;
+  document.getElementById('stat-pendientes').textContent = pedidos.filter(p => p.estado === 'pendiente').length;
+  document.getElementById('stat-cotizados').textContent = pedidos.filter(p => p.estado === 'cotizado' || p.estado === 'aceptado').length;
+}
+
+/* ---------- Formateo de moneda ---------- */
+function fmt(n) { return '$' + Number(n || 0).toFixed(2); }
+
+/* ---------- Render de pedidos ---------- */
+function renderPedidos() {
+  const cont = document.getElementById('lista-pedidos');
+  if (!cont) return;
+  const pedidos = getPedidos();
+
+  if (pedidos.length === 0) {
+    cont.innerHTML = '<div class="empty-state"><p class="text-5xl mb-3">~</p><p>Aun no hay cotizaciones recibidas.</p></div>';
+    return;
+  }
+
+  cont.innerHTML = pedidos.map(p => {
+    const fecha = new Date(p.fecha).toLocaleString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const estadoInfo = {
+      pendiente: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
+      cotizado:  { label: 'Factura enviada', color: 'bg-blue-100 text-blue-700' },
+      aceptado:  { label: 'Aceptado - Pago pendiente', color: 'bg-purple-100 text-purple-700' },
+      cancelado: { label: 'Cancelado', color: 'bg-red-100 text-red-700' }
+    }[p.estado] || { label: p.estado, color: 'bg-gray-100 text-gray-700' };
+
+    const itemsRows = p.items.map((it, idx) => `
+      <div class="flex items-center justify-between gap-3 py-3 border-b border-gray-50 last:border-b-0">
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm truncate">${it.nombre}</p>
+          <p class="text-xs text-gray-400">Cantidad: ${it.cantidad}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">Precio u.</span>
+          <input type="number" min="0" step="0.01" class="precio-input"
+                 data-pedido="${p.id}" data-idx="${idx}"
+                 value="${it.precioUnitario || ''}" placeholder="0.00"
+                 oninput="actualizarTotal('${p.id}')">
+        </div>
+      </div>`).join('');
+
+    const total = (p.items || []).reduce((s, i) => s + (Number(i.precioUnitario) || 0) * i.cantidad, 0);
+
+    return `
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div class="flex items-start justify-between flex-wrap gap-3 mb-3">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">${p.id}</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${estadoInfo.color}">${estadoInfo.label}</span>
+            </div>
+            <h3 class="font-bold text-lg">${p.cliente.nombre}</h3>
+            <p class="text-sm text-gray-500">C.I. ${p.cliente.cedula} - ${p.cliente.telefono}</p>
+            <p class="text-xs text-gray-400 mt-1">${fecha}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-gray-400 uppercase tracking-wider">Total</p>
+            <p class="font-display text-2xl text-tinta" id="total-${p.id}">${fmt(total)}</p>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-2 mb-3">
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Asignar precios</p>
+          ${itemsRows}
+        </div>
+
+        ${p.cliente.notas ? '<p class="text-xs text-gray-500 italic mb-3">"' + p.cliente.notas + '"</p>' : ''}
+
+        <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+          <button onclick="guardarPrecios('${p.id}')" class="btn-ghost text-xs font-bold px-4 py-2.5 rounded-full">Guardar precios</button>
+          <button onclick="generarFactura('${p.id}')" class="btn-wsp text-xs font-bold px-4 py-2.5 rounded-full inline-flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.464 3.488"/></svg>
+            Generar factura y contactar
+          </button>
+          <button onclick="verFactura('${p.id}')" class="btn-ghost text-xs font-bold px-4 py-2.5 rounded-full">Ver factura</button>
+          <button onclick="eliminarPedido('${p.id}')" class="text-xs font-bold px-4 py-2.5 rounded-full text-red-500 hover:bg-red-50 transition ml-auto">Eliminar</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function actualizarTotal(pedidoId) {
+  const inputs = document.querySelectorAll('.precio-input[data-pedido="' + pedidoId + '"]');
+  let total = 0;
+  inputs.forEach(inp => {
+    const pedidos = getPedidos();
+    const p = pedidos.find(x => x.id === pedidoId);
+    if (!p) return;
+    const idx = Number(inp.dataset.idx);
+    const cantidad = p.items[idx].cantidad || 1;
+    total += (Number(inp.value) || 0) * cantidad;
+  });
+  const el = document.getElementById('total-' + pedidoId);
+  if (el) el.textContent = fmt(total);
+}
+
+function guardarPrecios(pedidoId) {
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+  document.querySelectorAll('.precio-input[data-pedido="' + pedidoId + '"]').forEach(inp => {
+    const idx = Number(inp.dataset.idx);
+    p.items[idx].precioUnitario = Number(inp.value) || 0;
+  });
+  p.total = p.items.reduce((s, i) => s + (Number(i.precioUnitario) || 0) * i.cantidad, 0);
+  savePedidos(pedidos);
+  renderPedidos(); renderStats();
+  mostrarToast('Precios guardados');
+}
+
+function generarFactura(pedidoId) {
+  guardarPrecios(pedidoId);
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+
+  if (!p.items.some(i => Number(i.precioUnitario) > 0)) {
+    mostrarToast('Asigna precios antes de generar la factura', 'error');
+    return;
+  }
+
+  // Generar URL de factura con datos codificados
+  const encoded = b64encode(p);
+  const basePath = window.location.href.replace(/admin\.html.*$/, '').replace(/\/$/, '');
+  const facturaUrl = basePath + '/factura.html?d=' + encoded;
+
+  // Estado a 'cotizado'
+  p.estado = 'cotizado';
+  savePedidos(pedidos);
+  renderPedidos(); renderStats();
+
+  // Abrir WhatsApp al cliente
+  const telefonoCliente = p.cliente.telefono.replace(/[^0-9]/g, '');
+  let msg = 'Hola ' + p.cliente.nombre + '!%0A%0A';
+  msg += 'Ya tienes tu cotizacion lista.%0A%0A';
+  msg += 'Total: *' + fmt(p.total) + '*%0A';
+  msg += 'Productos: ' + p.items.length + '%0A%0A';
+  msg += 'Puedes ver tu factura completa aqui:%0A' + facturaUrl + '%0A%0A';
+  msg += 'Cualquier duda me avisas!';
+
+  window.open('https://wa.me/' + telefonoCliente + '?text=' + msg, '_blank');
+  mostrarToast('Factura generada y enviada por WhatsApp');
+}
+
+function verFactura(pedidoId) {
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+  const encoded = b64encode(p);
+  const basePath = window.location.href.replace(/admin\.html.*$/, '').replace(/\/$/, '');
+  window.open(basePath + '/factura.html?d=' + encoded, '_blank');
+}
+
+function eliminarPedido(pedidoId) {
+  if (!confirm('Eliminar esta cotizacion permanentemente?')) return;
+  savePedidos(getPedidos().filter(p => p.id !== pedidoId));
+  renderPedidos(); renderStats();
+  mostrarToast('Cotizacion eliminada');
+}
+
+/* ---------- Productos ---------- */
+function renderProductosAdmin() {
+  const cont = document.getElementById('lista-productos-admin');
+  if (!cont) return;
+  const productos = getProductos();
+  cont.innerHTML = productos.map(p => `
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="h-40 bg-gray-100 overflow-hidden">
+        <img src="${p.imagen}" alt="${p.nombre}" data-fallback class="producto-img">
+      </div>
+      <div class="p-4">
+        <p class="text-[10px] font-bold uppercase tracking-wider text-rosa mb-1">${etiquetaCategoria(p.categoria)}</p>
+        <h4 class="font-bold text-sm leading-tight mb-1">${p.nombre}</h4>
+        <p class="text-xs text-gray-400 line-clamp-2 mb-3">${p.descripcion}</p>
+        <button onclick="eliminarProducto(${p.id})" class="text-xs font-bold text-red-500 hover:text-red-700 transition">Eliminar</button>
+      </div>
+    </div>`).join('');
+  activarFallbackImagenes();
+}
+
+function eliminarProducto(id) {
+  if (!confirm('Eliminar este producto del catalogo?')) return;
+  saveProductos(getProductos().filter(p => p.id !== id));
+  renderProductosAdmin();
+  mostrarToast('Producto eliminado');
+}
+
+function agregarProducto(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('np-nombre').value.trim();
+  const categoria = document.getElementById('np-categoria').value;
+  const descripcion = document.getElementById('np-descripcion').value.trim();
+  const imagen = document.getElementById('np-imagen').value.trim() || 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&q=80';
+  if (!nombre) { mostrarToast('Ingresa un nombre', 'error'); return; }
+  const productos = getProductos();
+  productos.push({ id: Date.now(), nombre, categoria, descripcion, imagen });
+  saveProductos(productos);
+  e.target.reset(); renderProductosAdmin();
+  mostrarToast('Producto anadido');
+}
+
+/* ---------- Home editor ---------- */
+function guardarHome(e) {
+  e.preventDefault();
+  const data = {
+    heroTitulo: document.getElementById('edit-hero-titulo').value,
+    heroSubtitulo: document.getElementById('edit-hero-subtitulo').value,
+    heroImagen: document.getElementById('edit-hero-imagen').value
+  };
+  localStorage.setItem('chipilines_home', JSON.stringify(data));
+  mostrarToast('Contenido del inicio guardado');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!estaLogueado()) {
+    document.getElementById('login-overlay').style.display = 'flex';
+  } else {
+    document.getElementById('login-overlay').style.display = 'none';
+    iniciarAdmin();
+  }
+  const formProd = document.getElementById('form-nuevo-producto');
+  if (formProd) formProd.addEventListener('submit', agregarProducto);
+  const formHome = document.getElementById('form-home');
+  if (formHome) formHome.addEventListener('submit', guardarHome);
+});
+
+function mostrarToast(msg, tipo = 'ok') {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast'; toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.background = tipo === 'error' ? '#c0392b' : '#2D2A32';
+  toast.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+function activarFallbackImagenes() {
+  document.querySelectorAll('img[data-fallback]').forEach(img => {
+    img.addEventListener('error', () => {
+      const parent = img.parentElement;
+      img.style.display = 'none';
+      if (parent && !parent.classList.contains('img-fallback')) parent.classList.add('img-fallback');
+    });
+  });
+}

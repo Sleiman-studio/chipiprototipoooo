@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tubular-cheesecake-d5c238.netlify.app/sitemap.xml

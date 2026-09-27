@@ -1,0 +1,1237 @@
+/* =========================================================
+   CHIPILINES - Panel admin v2
+   ========================================================= */
+
+const ADMIN_PASSWORD = 'chipilines2024';
+
+const DATOS_PAGO = {
+  pagoMovil: { banco: 'Banesco', telefono: '0412-8048173', cedula: 'V-12345678', titular: 'Chipilines Venezuela' },
+  transferencia: { banco: 'Banesco', cuenta: '0134-XXXX-XX-XXXXXXXXXX', titular: 'Chipilines Venezuela', rif: 'J-XXXXXXXX-X' },
+  zelle: { email: 'pagos@chipilines.com', titular: 'Chipilines Venezuela' },
+  binance: { email: 'pagos@chipilines.com', red: 'TRC20 (USDT)' },
+  paypal: { email: 'pagos@chipilines.com' },
+  efectivo: { nota: 'Coordinar punto de encuentro en Los Palos Grandes, Caracas.' }
+};
+
+/* ============ SESION ============ */
+function estaLogueado() { return sessionStorage.getItem('chipilines_admin') === 'ok'; }
+
+function loginAdmin(e) {
+  e.preventDefault();
+  const pass = document.getElementById('admin-pass').value;
+  if (pass === ADMIN_PASSWORD) {
+    sessionStorage.setItem('chipilines_admin', 'ok');
+    document.getElementById('login-overlay').style.display = 'none';
+    iniciarAdmin();
+  } else {
+    mostrarToast('Contrasena incorrecta', 'error');
+  }
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem('chipilines_admin');
+  location.reload();
+}
+
+/* ============ NAVEGACION ============ */
+function irASeccion(nombre) {
+  document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.admin-link').forEach(a => a.classList.remove('active'));
+  const sec = document.getElementById('section-' + nombre);
+  const link = document.querySelector('.admin-link[data-section="' + nombre + '"]');
+  if (sec) sec.classList.add('active');
+  if (link) link.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Refrescar datos al cambiar de seccion
+  if (nombre === 'dashboard') { renderStats(); renderUltimas(); }
+  if (nombre === 'pedidos') renderPedidos();
+  if (nombre === 'catalogo') renderProductosAdmin();
+}
+
+function activarNav() {
+  document.querySelectorAll('.admin-link[data-section]').forEach(link => {
+    link.addEventListener('click', () => irASeccion(link.dataset.section));
+  });
+}
+
+/* ============ INICIO ============ */
+function iniciarAdmin() {
+  activarNav();
+  renderStats();
+  renderUltimas();
+  renderPedidos();
+  renderCategoriasAdmin();
+  renderProductosAdmin();
+  activarDragDrop();
+  cargarHomeEditor();
+}
+
+/* ============ HELPERS ============ */
+function fmt(n) { return '$' + Number(n || 0).toFixed(2); }
+
+function colorAvatar(nombre) {
+  const paleta = ['#E8B4C8', '#A8D8EA', '#D4AF37', '#C9A87C', '#B0C4DE', '#F4A6B8', '#A8E6CF'];
+  let h = 0;
+  for (let i = 0; i < (nombre || '').length; i++) h = (h * 31 + nombre.charCodeAt(i)) % paleta.length;
+  return paleta[h];
+}
+
+function iniciales(nombre) {
+  return (nombre || '?').split(' ').filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
+}
+
+function estadoInfo(estado) {
+  const m = {
+    pendiente: { label: 'Pendiente', badge: 'badge-amarillo' },
+    cotizado:  { label: 'Factura enviada', badge: 'badge-cielo' },
+    aceptado:  { label: 'Aceptado - Esperando pago', badge: 'badge-morado' },
+    pagado:    { label: 'Pagado', badge: 'badge-verde' },
+    cancelado: { label: 'Cancelado', badge: 'badge-rojo' }
+  };
+  return m[estado] || { label: estado, badge: 'badge-gris' };
+}
+
+/* ============ STATS ============ */
+function renderStats() {
+  const pedidos = getPedidos();
+  const productos = getProductos();
+
+  document.getElementById('stat-total').textContent = pedidos.length;
+  document.getElementById('stat-pendientes').textContent = pedidos.filter(p => p.estado === 'pendiente').length;
+  document.getElementById('stat-cotizados').textContent = pedidos.filter(p => p.estado === 'cotizado' || p.estado === 'aceptado').length;
+  document.getElementById('stat-pagados').textContent = pedidos.filter(p => p.estado === 'pagado').length;
+
+  const ingresos = pedidos.filter(p => p.estado === 'pagado').reduce((s, p) => s + (Number(p.pago?.monto) || Number(p.total) || 0), 0);
+  document.getElementById('stat-ingresos').textContent = fmt(ingresos);
+
+  const clientesSet = new Set(pedidos.map(p => (p.cliente.cedula || '').trim()).filter(Boolean));
+  document.getElementById('stat-clientes').textContent = clientesSet.size;
+
+  document.getElementById('stat-productos').textContent = productos.length;
+
+  const badge = document.getElementById('nav-badge-pedidos');
+  if (badge) {
+    const sinPrecio = pedidos.filter(p => p.estado === 'pendiente').length;
+    badge.textContent = sinPrecio;
+    badge.style.display = sinPrecio > 0 ? 'inline-flex' : 'none';
+  }
+}
+
+function renderUltimas() {
+  const cont = document.getElementById('dash-ultimas');
+  if (!cont) return;
+  const pedidos = getPedidos().slice(0, 5);
+  if (pedidos.length === 0) {
+    cont.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">Aun no hay cotizaciones.</p>';
+    return;
+  }
+  cont.innerHTML = pedidos.map(p => {
+    const info = estadoInfo(p.estado);
+    const fecha = new Date(p.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
+    const ini = iniciales(p.cliente.nombre);
+    const col = colorAvatar(p.cliente.nombre);
+    return `
+      <div class="flex items-center gap-3 py-3 border-b border-gray-50 last:border-b-0">
+        <div class="cliente-avatar text-white" style="background:${col}">${ini}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-sm truncate">${p.cliente.nombre}</p>
+          <p class="text-xs text-gray-400">${fecha} · ${p.items.length} producto${p.items.length > 1 ? 's' : ''}</p>
+        </div>
+        <div class="text-right">
+          <p class="font-bold text-sm">${fmt(p.total)}</p>
+          <span class="badge-soft ${info.badge} mt-1">${info.label}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ============ PEDIDOS: lista compacta expandible + seleccion masiva ============ */
+let __pedidosFiltrados = [];
+let __pedidosExpandidos = new Set();
+let __pedidosSeleccionados = new Set();
+
+function filtrarPedidos() {
+  const q = (document.getElementById('buscar-pedidos').value || '').toLowerCase().trim();
+  const estado = document.getElementById('filtro-estado').value;
+  const orden = document.getElementById('filtro-orden').value;
+
+  let lista = getPedidos();
+
+  if (q) {
+    lista = lista.filter(p => {
+      const txt = [p.cliente.nombre, p.cliente.cedula, p.cliente.telefono, p.id].join(' ').toLowerCase();
+      return txt.includes(q);
+    });
+  }
+  if (estado !== 'todos') lista = lista.filter(p => p.estado === estado);
+  if (orden === 'antiguos') lista = [...lista].reverse();
+  if (orden === 'mayor-monto') lista = [...lista].sort((a, b) => (b.total || 0) - (a.total || 0));
+
+  __pedidosFiltrados = lista;
+  renderPedidos();
+}
+
+function limpiarFiltrosPedidos() {
+  document.getElementById('buscar-pedidos').value = '';
+  document.getElementById('filtro-estado').value = 'todos';
+  document.getElementById('filtro-orden').value = 'recientes';
+  __pedidosFiltrados = [];
+  renderPedidos();
+}
+
+function toggleExpandirPedido(id) {
+  if (__pedidosExpandidos.has(id)) __pedidosExpandidos.delete(id);
+  else __pedidosExpandidos.add(id);
+  renderPedidos();
+}
+
+function togglePedidoSeleccionado(id, checkbox) {
+  if (checkbox.checked) __pedidosSeleccionados.add(id);
+  else __pedidosSeleccionados.delete(id);
+  actualizarMassBarPedidos();
+  // Actualizar el borde de la card sin re-render completo
+  const card = document.querySelector('[data-pedido-card="' + id + '"]');
+  if (card) {
+    if (checkbox.checked) card.classList.add('seleccionado');
+    else card.classList.remove('seleccionado');
+  }
+}
+
+function toggleTodosPedidos(checkbox) {
+  const visibles = __pedidosFiltrados.length > 0 || document.getElementById('buscar-pedidos')?.value || document.getElementById('filtro-estado')?.value !== 'todos'
+    ? __pedidosFiltrados
+    : getPedidos();
+  if (checkbox.checked) visibles.forEach(p => __pedidosSeleccionados.add(p.id));
+  else __pedidosSeleccionados.clear();
+  renderPedidos();
+}
+
+function deseleccionarTodosPedidos() {
+  __pedidosSeleccionados.clear();
+  const chk = document.getElementById('seleccionar-todos-pedidos');
+  if (chk) chk.checked = false;
+  renderPedidos();
+}
+
+function actualizarMassBarPedidos() {
+  const bar = document.getElementById('mass-bar-pedidos');
+  const cnt = document.getElementById('mass-count-pedidos');
+  if (!bar) return;
+  if (__pedidosSeleccionados.size > 0) {
+    bar.classList.add('show');
+    cnt.textContent = __pedidosSeleccionados.size + ' seleccionado' + (__pedidosSeleccionados.size !== 1 ? 's' : '');
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function borrarPedidosSeleccionados() {
+  const n = __pedidosSeleccionados.size;
+  if (n === 0) return;
+  if (!confirm('Eliminar ' + n + ' cotizacion' + (n !== 1 ? 'es' : '') + ' permanentemente?')) return;
+  const restantes = getPedidos().filter(p => !__pedidosSeleccionados.has(p.id));
+  savePedidos(restantes);
+  __pedidosSeleccionados.clear();
+  __pedidosExpandidos.clear();
+  __pedidosFiltrados = [];
+  const chk = document.getElementById('seleccionar-todos-pedidos');
+  if (chk) chk.checked = false;
+  renderPedidos(); renderStats(); renderUltimas();
+  mostrarToast(n + ' cotizacion' + (n !== 1 ? 'es' : '') + ' eliminada' + (n !== 1 ? 's' : ''));
+}
+
+function renderPedidos() {
+  const cont = document.getElementById('lista-pedidos');
+  if (!cont) return;
+
+  const hayFiltros = document.getElementById('buscar-pedidos')?.value || document.getElementById('filtro-estado')?.value !== 'todos';
+  const pedidos = hayFiltros ? __pedidosFiltrados : getPedidos();
+
+  const contador = document.getElementById('contador-pedidos');
+  if (contador) contador.textContent = pedidos.length + ' resultado' + (pedidos.length !== 1 ? 's' : '');
+
+  // Sincronizar checkbox "seleccionar todos"
+  const chkTodos = document.getElementById('seleccionar-todos-pedidos');
+  if (chkTodos) {
+    const todosMarcados = pedidos.length > 0 && pedidos.every(p => __pedidosSeleccionados.has(p.id));
+    chkTodos.checked = todosMarcados;
+  }
+
+  if (pedidos.length === 0) {
+    cont.innerHTML = '<div class="empty-state"><p class="text-5xl mb-3">~</p><p>No hay cotizaciones que coincidan.</p></div>';
+    actualizarMassBarPedidos();
+    return;
+  }
+
+  cont.innerHTML = pedidos.map(p => {
+    const fecha = new Date(p.fecha).toLocaleString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const info = estadoInfo(p.estado);
+    const ini = iniciales(p.cliente.nombre);
+    const col = colorAvatar(p.cliente.nombre);
+    const total = (p.items || []).reduce((s, i) => s + (Number(i.precioUnitario) || 0) * i.cantidad, 0);
+    const expandido = __pedidosExpandidos.has(p.id);
+    const seleccionado = __pedidosSeleccionados.has(p.id);
+
+    // Contenido expandido (solo se genera si esta abierto)
+    let detalleHTML = '';
+    if (expandido) {
+      const itemsHTML = p.items.map((it, idx) => `
+        <div class="flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-b-0">
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-sm truncate">${it.nombre}</p>
+            <p class="text-xs text-gray-400">Cantidad: ${it.cantidad}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400">Precio u.</span>
+            <input type="number" min="0" step="0.01" class="precio-input"
+                   data-pedido="${p.id}" data-idx="${idx}"
+                   value="${it.precioUnitario || ''}" placeholder="0.00"
+                   oninput="actualizarTotal('${p.id}')"
+                   onclick="event.stopPropagation()">
+          </div>
+        </div>`).join('');
+
+      let botones = '';
+      if (p.estado === 'pagado') {
+        botones = `
+          <div class="bg-green-50 border border-green-200 rounded-xl p-4 mt-2">
+            <p class="text-xs font-bold uppercase tracking-wider text-green-700 mb-2">Pago confirmado</p>
+            <div class="grid sm:grid-cols-3 gap-3 text-sm">
+              <div><p class="text-xs text-gray-500">Metodo</p><p class="font-bold text-green-800">${p.pago?.metodo || '-'}</p></div>
+              <div><p class="text-xs text-gray-500">Monto</p><p class="font-bold text-green-800">${p.pago?.monto ? fmt(p.pago.monto) : '-'}</p></div>
+              <div><p class="text-xs text-gray-500">Referencia</p><p class="font-bold text-green-800">${p.pago?.referencia || '-'}</p></div>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Marcado el ${p.pago?.fecha ? new Date(p.pago.fecha).toLocaleString('es-VE') : '-'}</p>
+          </div>`;
+      } else {
+        botones = `
+          <div class="flex flex-wrap gap-2">
+            <button onclick="event.stopPropagation(); guardarPrecios('${p.id}')" class="btn-ghost text-xs font-bold px-4 py-2.5 rounded-full">Guardar precios</button>
+            <button onclick="event.stopPropagation(); generarFactura('${p.id}')" class="btn-wsp text-xs font-bold px-4 py-2.5 rounded-full inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+              Generar factura y contactar
+            </button>
+            <button onclick="event.stopPropagation(); verFactura('${p.id}')" class="btn-ghost text-xs font-bold px-4 py-2.5 rounded-full">Ver factura</button>
+            <button onclick="event.stopPropagation(); abrirFormPago('${p.id}')" class="text-xs font-bold px-4 py-2.5 rounded-full bg-green-500 text-white hover:bg-green-600 transition">Marcar pagado</button>
+            <button onclick="event.stopPropagation(); eliminarPedido('${p.id}')" class="text-xs font-bold px-4 py-2.5 rounded-full text-red-500 hover:bg-red-50 transition ml-auto">Eliminar</button>
+          </div>
+          <div id="form-pago-${p.id}" class="hidden mt-3 bg-crema rounded-xl p-4">
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Registrar pago</p>
+            <div class="grid sm:grid-cols-3 gap-3 mb-3">
+              <div><label class="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1 block">Metodo</label>
+                <select id="pago-metodo-${p.id}" class="w-full bg-white rounded-lg px-3 py-2 text-sm outline-none border border-gray-200">
+                  <option value="Pago Movil">Pago Movil</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Zelle">Zelle</option>
+                  <option value="Binance USDT">Binance USDT</option>
+                  <option value="PayPal">PayPal</option>
+                  <option value="Efectivo">Efectivo</option>
+                </select></div>
+              <div><label class="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1 block">Monto</label>
+                <input id="pago-monto-${p.id}" type="number" step="0.01" class="w-full bg-white rounded-lg px-3 py-2 text-sm outline-none border border-gray-200"></div>
+              <div><label class="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1 block">Referencia</label>
+                <input id="pago-ref-${p.id}" type="text" class="w-full bg-white rounded-lg px-3 py-2 text-sm outline-none border border-gray-200"></div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="event.stopPropagation(); confirmarPago('${p.id}')" class="btn-wsp text-xs font-bold px-4 py-2 rounded-full">Confirmar pago</button>
+              <button onclick="event.stopPropagation(); cerrarFormPago('${p.id}')" class="btn-ghost text-xs font-bold px-4 py-2 rounded-full">Cancelar</button>
+            </div>
+          </div>`;
+      }
+
+      detalleHTML = `
+        <div class="mt-4 pt-4 border-t border-gray-100">
+          <div class="mb-3">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Asignar precios</p>
+            ${itemsHTML}
+          </div>
+          ${p.cliente.notas ? '<p class="text-xs text-gray-500 italic mb-3">"' + p.cliente.notas + '"</p>' : ''}
+          ${botones}
+        </div>`;
+    }
+
+    return `
+      <div data-pedido-card="${p.id}" class="pedido-card bg-white rounded-2xl shadow-sm border ${seleccionado ? 'border-rosa seleccionado' : 'border-gray-100'} overflow-hidden transition">
+        <div class="flex items-center gap-3 p-4 cursor-pointer select-none" onclick="toggleExpandirPedido('${p.id}')">
+          <label onclick="event.stopPropagation()" class="flex-shrink-0">
+            <input type="checkbox" class="check-custom" ${seleccionado ? 'checked' : ''} onchange="togglePedidoSeleccionado('${p.id}', this)">
+          </label>
+
+          <div class="cliente-avatar text-white flex-shrink-0" style="background:${col}; width:44px; height:44px;">${ini}</div>
+
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+              <p class="font-bold text-sm truncate">${p.cliente.nombre}</p>
+              <span class="badge-soft ${info.badge}">${info.label}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate">C.I. ${p.cliente.cedula} · ${p.cliente.telefono}</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">${p.id} · ${fecha}</p>
+          </div>
+
+          <div class="text-right flex-shrink-0 ml-2">
+            <p class="text-[10px] text-gray-400 uppercase tracking-wider">Total</p>
+            <p class="font-display text-xl text-tinta">${fmt(total)}</p>
+          </div>
+
+          <div class="flex-shrink-0 ml-1 transition-transform ${expandido ? 'rotate-180' : ''}">
+            <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+        ${detalleHTML}
+      </div>`;
+  }).join('');
+
+  actualizarMassBarPedidos();
+  activarFallbackImagenes();
+}
+
+function actualizarTotal(pedidoId) {
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+  const inputs = document.querySelectorAll('.precio-input[data-pedido="' + pedidoId + '"]');
+  let total = 0;
+  inputs.forEach(inp => {
+    const idx = Number(inp.dataset.idx);
+    total += (Number(inp.value) || 0) * (p.items[idx]?.cantidad || 1);
+  });
+  const el = document.getElementById('total-' + pedidoId);
+  if (el) el.textContent = fmt(total);
+}
+
+function guardarPrecios(pedidoId) {
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+  document.querySelectorAll('.precio-input[data-pedido="' + pedidoId + '"]').forEach(inp => {
+    const idx = Number(inp.dataset.idx);
+    p.items[idx].precioUnitario = Number(inp.value) || 0;
+  });
+  p.total = p.items.reduce((s, i) => s + (Number(i.precioUnitario) || 0) * i.cantidad, 0);
+  savePedidos(pedidos);
+  renderStats();
+  mostrarToast('Precios guardados');
+}
+
+function eliminarPedido(pedidoId) {
+  if (!confirm('Eliminar esta cotizacion permanentemente?')) return;
+  savePedidos(getPedidos().filter(p => p.id !== pedidoId));
+  __pedidosFiltrados = __pedidosFiltrados.filter(p => p.id !== pedidoId);
+  renderPedidos(); renderStats(); renderUltimas();
+  mostrarToast('Cotizacion eliminada');
+}
+
+function abrirFormPago(pedidoId) {
+  const el = document.getElementById('form-pago-' + pedidoId);
+  if (!el) return;
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (p) {
+    const montoInput = document.getElementById('pago-monto-' + pedidoId);
+    if (montoInput && p.total) montoInput.value = p.total;
+  }
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cerrarFormPago(pedidoId) {
+  const el = document.getElementById('form-pago-' + pedidoId);
+  if (el) el.classList.add('hidden');
+}
+
+function confirmarPago(pedidoId) {
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+  const metodo = document.getElementById('pago-metodo-' + pedidoId).value;
+  const monto = Number(document.getElementById('pago-monto-' + pedidoId).value) || p.total || 0;
+  const referencia = document.getElementById('pago-ref-' + pedidoId).value.trim();
+  p.estado = 'pagado';
+  p.pago = { metodo, monto, referencia, fecha: new Date().toISOString() };
+  savePedidos(pedidos);
+  renderPedidos(); renderStats(); renderUltimas();
+  mostrarToast('Pago registrado');
+}
+
+/* ============ GENERAR FACTURA ============ */
+function esLinkPublico(url) { return url.indexOf('http://') === 0 || url.indexOf('https://') === 0; }
+
+function compactarPedido(p) {
+  const compact = {
+    i: p.id, f: p.fecha,
+    c: { n: p.cliente.nombre, d: p.cliente.cedula, t: p.cliente.telefono, e: p.cliente.evento || '', o: p.cliente.notas || '' },
+    it: (p.items || []).map(x => ({ n: x.nombre, c: x.cantidad, p: Number(x.precioUnitario) || 0 })),
+    tt: p.total, es: p.estado
+  };
+  const json = JSON.stringify(compact);
+  if (typeof LZString !== 'undefined' && LZString.compressToEncodedURIComponent) {
+    return LZString.compressToEncodedURIComponent(json);
+  }
+  return b64encode(compact);
+}
+
+function acortarUrl(urlLarga) {
+  const encoded = encodeURIComponent(urlLarga);
+  const servicios = [
+    { url: 'https://tinyurl.com/api-create.php?url=' + encoded, type: 'text' },
+    { url: 'https://is.gd/create.php?format=simple&url=' + encoded, type: 'text' },
+    { url: 'https://cleanuri.com/api/v1/shorten', type: 'post', body: 'url=' + encoded }
+  ];
+  return new Promise((resolve) => {
+    let idx = 0;
+    function intentar() {
+      if (idx >= servicios.length) { resolve(urlLarga); return; }
+      const s = servicios[idx++];
+      const opts = s.type === 'post'
+        ? { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: s.body }
+        : { method: 'GET' };
+      fetch(s.url, opts)
+        .then(r => r.text())
+        .then(txt => {
+          let link = txt.trim();
+          try { const j = JSON.parse(link); link = j.result_url || j.short_url || ''; } catch(e) {}
+          if (link && link.indexOf('http') === 0 && link.length < 60) resolve(link);
+          else intentar();
+        })
+        .catch(() => intentar());
+    }
+    intentar();
+  });
+}
+
+function generarFactura(pedidoId) {
+  guardarPrecios(pedidoId);
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+
+  if (!p.items.some(i => Number(i.precioUnitario) > 0)) {
+    mostrarToast('Asigna precios antes de generar la factura', 'error');
+    return;
+  }
+
+  const basePath = window.location.origin;
+  const encoded = compactarPedido(p);
+  const facturaUrl = basePath + '/factura.html?d=' + encoded;
+  const facturaAutoImg = facturaUrl + '&dl=img&preview=1';
+
+  p.estado = 'cotizado';
+  savePedidos(pedidos);
+  renderPedidos(); renderStats();
+
+  const normFn = (typeof normalizarTelefonoVE === 'function')
+    ? normalizarTelefonoVE
+    : function(tel) {
+        let t = String(tel || '').replace(/[^0-9]/g, '');
+        if (!t) return '';
+        if (t.startsWith('0')) t = t.slice(1);
+        if (!t.startsWith('58')) t = '58' + t;
+        return t;
+      };
+  const tel = normFn(p.cliente.telefono);
+
+  if (!tel || tel.length < 11) {
+    mostrarToast('Telefono invalido: ' + p.cliente.telefono, 'error');
+    return;
+  }
+
+  const wspWin = window.open('about:blank', '_blank');
+  if (wspWin) {
+    wspWin.document.write('<html><head><title>Preparando WhatsApp...</title></head><body style="font-family:sans-serif;padding:40px;text-align:center;color:#666;"><h2>Preparando tu factura...</h2><p>Esto tarda 2 segundos.</p></body></html>');
+  }
+
+  mostrarToast('Generando link corto...');
+
+  acortarUrl(facturaUrl).then(linkFinal => {
+    let textoPlano = 'Hola ' + p.cliente.nombre + ', recibimos tu pedido.\n\n';
+    textoPlano += 'Aqui esta tu factura:\n' + linkFinal;
+    const msgEncoded = encodeURIComponent(textoPlano);
+    const wspUrl = 'https://wa.me/' + tel + '?text=' + msgEncoded;
+
+    if (wspWin) wspWin.location.href = wspUrl;
+    else window.open(wspUrl, '_blank');
+
+    mostrarToast('WhatsApp abierto: ' + linkFinal.replace('https://', ''));
+    setTimeout(() => {
+      const facWin = window.open(facturaAutoImg, '_blank');
+      if (facWin) mostrarToast('Adjunta la imagen al chat');
+    }, 300);
+  });
+}
+
+function verFactura(pedidoId) {
+  guardarPrecios(pedidoId);
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === pedidoId);
+  if (!p) return;
+  const encoded = compactarPedido(p);
+  const basePath = window.location.origin;
+  window.open(basePath + '/factura.html?d=' + encoded + '&preview=1', '_blank');
+}
+
+/* ============ CATALOGO ============ */
+let __productosFiltrados = [];
+let __productosSeleccionados = new Set();
+
+function filtrarProductos() {
+  const q = (document.getElementById('buscar-productos').value || '').toLowerCase().trim();
+  const cat = document.getElementById('filtro-categoria-productos').value;
+  let lista = getProductos();
+  if (q) lista = lista.filter(p => (p.nombre + ' ' + p.descripcion).toLowerCase().includes(q));
+  if (cat !== 'todos') lista = lista.filter(p => p.categoria === cat);
+  __productosFiltrados = lista;
+  renderProductosAdmin();
+}
+
+function renderProductosAdmin() {
+  const cont = document.getElementById('lista-productos-admin');
+  if (!cont) return;
+
+  const hayFiltros = document.getElementById('buscar-productos')?.value || (document.getElementById('filtro-categoria-productos')?.value !== 'todos');
+  const productos = hayFiltros ? __productosFiltrados : getProductos();
+
+  if (productos.length === 0) {
+    cont.innerHTML = '<div class="col-span-full empty-state"><p class="text-5xl mb-3">~</p><p>No hay productos que coincidan.</p></div>';
+    return;
+  }
+
+  cont.innerHTML = productos.map(p => {
+    const seleccionado = __productosSeleccionados.has(p.id);
+    return `
+      <div class="bg-white rounded-2xl shadow-sm border ${seleccionado ? 'border-rosa' : 'border-gray-100'} overflow-hidden relative group" data-producto-id="${p.id}">
+        <div class="relative h-44 bg-gray-100 overflow-hidden">
+          <img src="${p.imagen}" alt="${p.nombre}" data-fallback class="producto-img w-full h-full object-cover">
+          <label class="absolute top-3 left-3 cursor-pointer">
+            <input type="checkbox" class="check-custom" ${seleccionado ? 'checked' : ''} onchange="toggleProducto(${p.id}, this)">
+          </label>
+        </div>
+        <div class="p-4">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-rosa mb-1">${etiquetaCategoria(p.categoria)}</p>
+          <h4 class="font-bold text-sm leading-tight mb-1 line-clamp-2">${p.nombre}</h4>
+          <p class="text-xs text-gray-400 line-clamp-2 mb-3">${p.descripcion}</p>
+          <div class="flex gap-2">
+            <button onclick="editarProducto(${p.id})" class="btn-ghost text-xs font-bold px-3 py-1.5 rounded-full flex-1 inline-flex items-center justify-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Editar
+            </button>
+            <button onclick="eliminarProducto(${p.id})" class="text-xs font-bold px-3 py-1.5 rounded-full text-red-500 hover:bg-red-50 transition inline-flex items-center justify-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  activarFallbackImagenes();
+  actualizarMassBar();
+}
+
+function toggleProducto(id, checkbox) {
+  if (checkbox.checked) __productosSeleccionados.add(id);
+  else __productosSeleccionados.delete(id);
+  renderProductosAdmin();
+}
+
+function toggleTodosProductos(checkbox) {
+  if (checkbox.checked) {
+    __productosFiltrados.forEach(p => __productosSeleccionados.add(p.id));
+    getProductos().forEach(p => {
+      // Solo seleccionar los visibles si hay filtro, si no todos
+    });
+    // Marcar todos los visibles
+    const hayFiltros = document.getElementById('buscar-productos')?.value || (document.getElementById('filtro-categoria-productos')?.value !== 'todos');
+    const visibles = hayFiltros ? __productosFiltrados : getProductos();
+    visibles.forEach(p => __productosSeleccionados.add(p.id));
+  } else {
+    __productosSeleccionados.clear();
+  }
+  renderProductosAdmin();
+}
+
+function deseleccionarTodos() {
+  __productosSeleccionados.clear();
+  const chk = document.getElementById('seleccionar-todos');
+  if (chk) chk.checked = false;
+  renderProductosAdmin();
+}
+
+function actualizarMassBar() {
+  const bar = document.getElementById('mass-bar');
+  const cnt = document.getElementById('mass-count');
+  if (!bar) return;
+  if (__productosSeleccionados.size > 0) {
+    bar.classList.add('show');
+    cnt.textContent = __productosSeleccionados.size + ' seleccionado' + (__productosSeleccionados.size !== 1 ? 's' : '');
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function borrarSeleccionados() {
+  const n = __productosSeleccionados.size;
+  if (n === 0) return;
+  if (!confirm('Eliminar ' + n + ' producto' + (n !== 1 ? 's' : '') + ' permanentemente?')) return;
+  const productos = getProductos().filter(p => !__productosSeleccionados.has(p.id));
+  saveProductos(productos);
+  __productosSeleccionados.clear();
+  const chk = document.getElementById('seleccionar-todos');
+  if (chk) chk.checked = false;
+  filtrarProductos();
+  renderStats();
+  mostrarToast(n + ' producto' + (n !== 1 ? 's' : '') + ' eliminado' + (n !== 1 ? 's' : ''));
+}
+
+/* Modal de producto */
+function abrirModalProducto() {
+  document.getElementById('modal-producto-titulo').textContent = 'Nuevo producto';
+  document.getElementById('np-id').value = '';
+  document.getElementById('np-nombre').value = '';
+  document.getElementById('np-categoria').value = 'placas';
+  document.getElementById('np-descripcion').value = '';
+  window.__imgProducto = null;
+  resetUploadZone('np-upload', 'np');
+  document.getElementById('modal-producto').classList.add('show');
+}
+
+function cerrarModalProducto() {
+  document.getElementById('modal-producto').classList.remove('show');
+}
+
+function editarProducto(id) {
+  const p = getProductos().find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('modal-producto-titulo').textContent = 'Editar producto';
+  document.getElementById('np-id').value = id;
+  document.getElementById('np-nombre').value = p.nombre;
+  document.getElementById('np-categoria').value = p.categoria;
+  document.getElementById('np-descripcion').value = p.descripcion || '';
+  window.__imgProducto = p.imagen;
+  pintarPreviewUpload('np-upload', p.imagen);
+  document.getElementById('modal-producto').classList.add('show');
+}
+
+function guardarProducto(e) {
+  e.preventDefault();
+  const id = document.getElementById('np-id').value;
+  const nombre = document.getElementById('np-nombre').value.trim();
+  const categoria = document.getElementById('np-categoria').value;
+  const descripcion = document.getElementById('np-descripcion').value.trim();
+
+  if (!nombre) { mostrarToast('Ingresa un nombre', 'error'); return; }
+  if (!window.__imgProducto) { mostrarToast('Sube una imagen para el producto', 'error'); return; }
+
+  let productos = getProductos();
+
+  if (id) {
+    // Editar
+    const idx = productos.findIndex(p => String(p.id) === String(id));
+    if (idx >= 0) {
+      productos[idx] = { ...productos[idx], nombre, categoria, descripcion, imagen: window.__imgProducto };
+    }
+    mostrarToast('Producto actualizado');
+  } else {
+    // Nuevo
+    productos.push({ id: Date.now(), nombre, categoria, descripcion, imagen: window.__imgProducto });
+    mostrarToast('Producto anadido');
+  }
+
+  saveProductos(productos);
+  cerrarModalProducto();
+  filtrarProductos();
+  renderStats();
+}
+
+function eliminarProducto(id) {
+  const p = getProductos().find(x => x.id === id);
+  if (!p) return;
+  if (!confirm('Eliminar "' + p.nombre + '" permanentemente?')) return;
+  saveProductos(getProductos().filter(x => x.id !== id));
+  __productosSeleccionados.delete(id);
+  filtrarProductos();
+  renderStats();
+  mostrarToast('Producto eliminado');
+}
+
+/* ============ UPLOAD ============ */
+window.__imgProducto = null;
+window.__imgHero = null;
+
+function abrirSelectorImagen(tipo) {
+  const input = document.getElementById(tipo + '-file');
+  if (input) input.click();
+}
+
+function comprimirImagen(file, maxAncho, calidad) {
+  maxAncho = maxAncho || 900;
+  calidad = calidad || 0.8;
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) { reject(new Error('El archivo no es una imagen')); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxAncho) { h = Math.round((h * maxAncho) / w); w = maxAncho; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', calidad));
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Error al leer archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function pintarPreviewUpload(zoneId, dataUrl) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.classList.add('has-image');
+  zone.innerHTML = `
+    <img src="${dataUrl}" alt="Preview" class="upload-preview">
+    <button type="button" class="upload-remove" onclick="event.stopPropagation(); quitarImagen('${zoneId}')">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>`;
+}
+
+function resetUploadZone(zoneId, tipo) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.classList.remove('has-image');
+  const handler = tipo === 'np' ? 'cargarImagenProducto' : 'cargarImagenHero';
+  zone.innerHTML = `
+    <input type="file" id="${tipo}-file" accept="image/*" style="display:none" onchange="${handler}(this)">
+    <div class="upload-icon">
+      <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    </div>
+    <div class="upload-text">Toca para subir o arrastra una foto aqui</div>
+    <div class="upload-hint">JPG, PNG o WEBP - Se comprime automaticamente</div>`;
+}
+
+function quitarImagen(zoneId) {
+  if (zoneId === 'np-upload') { window.__imgProducto = null; resetUploadZone('np-upload', 'np'); }
+  else if (zoneId === 'hero-upload') { window.__imgHero = null; resetUploadZone('hero-upload', 'hero'); }
+}
+
+async function cargarImagenProducto(input) {
+  if (!input.files || !input.files[0]) return;
+  try {
+    mostrarToast('Procesando imagen...');
+    const dataUrl = await comprimirImagen(input.files[0], 900, 0.8);
+    window.__imgProducto = dataUrl;
+    pintarPreviewUpload('np-upload', dataUrl);
+    mostrarToast('Imagen lista');
+  } catch(e) { mostrarToast(e.message || 'Error al cargar', 'error'); }
+}
+
+async function cargarImagenHero(input) {
+  if (!input.files || !input.files[0]) return;
+  try {
+    mostrarToast('Procesando imagen...');
+    const dataUrl = await comprimirImagen(input.files[0], 1400, 0.82);
+    window.__imgHero = dataUrl;
+    pintarPreviewUpload('hero-upload', dataUrl);
+    mostrarToast('Imagen lista');
+  } catch(e) { mostrarToast(e.message || 'Error al cargar', 'error'); }
+}
+
+function activarDragDrop() {
+  ['np-upload', 'hero-upload'].forEach(id => {
+    const zone = document.getElementById(id);
+    if (!zone || zone.dataset.dd === '1') return;
+    zone.dataset.dd = '1';
+    ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('dragover'); }));
+    ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove('dragover'); }));
+    zone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!file) return;
+      const input = document.getElementById(id === 'np-upload' ? 'np-file' : 'hero-file');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      if (id === 'np-upload') cargarImagenProducto(input);
+      else cargarImagenHero(input);
+    });
+  });
+}
+
+/* ============ HOME ============ */
+function cargarHomeEditor() {
+  const raw = localStorage.getItem('chipilines_home');
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if (d.heroImagen) {
+      window.__imgHero = d.heroImagen;
+      pintarPreviewUpload('hero-upload', d.heroImagen);
+    }
+    if (d.heroTitulo) document.getElementById('edit-hero-titulo').value = d.heroTitulo;
+    if (d.heroSubtitulo) document.getElementById('edit-hero-subtitulo').value = d.heroSubtitulo;
+  } catch(e) {}
+}
+
+function guardarHome(e) {
+  e.preventDefault();
+  const data = {
+    heroTitulo: document.getElementById('edit-hero-titulo').value,
+    heroSubtitulo: document.getElementById('edit-hero-subtitulo').value,
+    heroImagen: window.__imgHero || null
+  };
+  const raw = localStorage.getItem('chipilines_home');
+  if (!data.heroImagen && raw) {
+    try { data.heroImagen = JSON.parse(raw).heroImagen; } catch(e) {}
+  }
+  localStorage.setItem('chipilines_home', JSON.stringify(data));
+  mostrarToast('Contenido del inicio guardado');
+}
+
+function previewHome() {
+  const data = {
+    heroTitulo: document.getElementById('edit-hero-titulo').value,
+    heroSubtitulo: document.getElementById('edit-hero-subtitulo').value,
+    heroImagen: window.__imgHero || null
+  };
+  // Si no hay imagen nueva, usar la guardada actual
+  if (!data.heroImagen) {
+    const raw = localStorage.getItem('chipilines_home');
+    if (raw) {
+      try { data.heroImagen = JSON.parse(raw).heroImagen; } catch(e) {}
+    }
+  }
+  // Guardar en clave temporal para no pisar el home real
+  localStorage.setItem('chipilines_home_preview', JSON.stringify(data));
+  // Abrir index con param preview=1
+  window.open('index.html?preview=1', '_blank');
+  mostrarToast('Vista previa abierta (no guardado)');
+}
+
+/* ============ TOAST ============ */
+function mostrarToast(msg, tipo = 'ok') {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast'; toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.background = tipo === 'error' ? '#c0392b' : '#2D2A32';
+  toast.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
+function activarFallbackImagenes() {
+  document.querySelectorAll('img[data-fallback]').forEach(img => {
+    if (img.dataset.fb === '1') return;
+    img.dataset.fb = '1';
+    img.addEventListener('error', () => {
+      const parent = img.parentElement;
+      img.style.display = 'none';
+      if (parent && !parent.classList.contains('img-fallback')) parent.classList.add('img-fallback');
+    });
+  });
+}
+
+/* ============ INIT ============ */
+document.addEventListener('DOMContentLoaded', () => {
+  if (!estaLogueado()) {
+    document.getElementById('login-overlay').style.display = 'flex';
+  } else {
+    document.getElementById('login-overlay').style.display = 'none';
+    iniciarAdmin();
+  }
+  const formProd = document.getElementById('form-producto');
+  if (formProd) formProd.addEventListener('submit', guardarProducto);
+  const formHome = document.getElementById('form-home');
+  if (formHome) formHome.addEventListener('submit', guardarHome);
+});
+
+
+/* ============ CATEGORIAS ============ */
+function renderCategoriasAdmin() {
+  const cont = document.getElementById('lista-categorias-admin');
+  if (!cont) return;
+  const cats = getCategorias();
+  if (cats.length === 0) {
+    cont.innerHTML = '<p class="text-sm text-gray-400 italic">No hay categorias. Crea la primera.</p>';
+    return;
+  }
+  cont.innerHTML = cats.map(c => {
+    const count = getProductos().filter(p => p.categoria === c.id).length;
+    return `
+      <div class="group flex items-center gap-2 bg-crema rounded-full pl-4 pr-2 py-2 hover:bg-rosa/10 transition">
+        <span class="font-semibold text-sm">${c.label}</span>
+        <span class="text-xs text-gray-400">(${count})</span>
+        <button onclick="editarCategoria('${c.id}')" class="w-7 h-7 rounded-full hover:bg-white flex items-center justify-center transition" title="Editar" aria-label="Editar categoria">
+          <svg class="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <button onclick="eliminarCategoria('${c.id}')" class="w-7 h-7 rounded-full hover:bg-red-50 flex items-center justify-center transition" title="Eliminar" aria-label="Eliminar categoria">
+          <svg class="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+function abrirModalCategoria() {
+  document.getElementById('modal-categoria-titulo').textContent = 'Nueva categoria';
+  document.getElementById('cat-id').value = '';
+  document.getElementById('cat-nombre').value = '';
+  document.getElementById('modal-categoria').classList.add('show');
+  setTimeout(() => document.getElementById('cat-nombre').focus(), 100);
+}
+
+function cerrarModalCategoria() {
+  document.getElementById('modal-categoria').classList.remove('show');
+}
+
+function editarCategoria(id) {
+  const cat = getCategorias().find(c => c.id === id);
+  if (!cat) return;
+  document.getElementById('modal-categoria-titulo').textContent = 'Editar categoria';
+  document.getElementById('cat-id').value = id;
+  document.getElementById('cat-nombre').value = cat.label;
+  document.getElementById('modal-categoria').classList.add('show');
+}
+
+function guardarCategoria(e) {
+  e.preventDefault();
+  const id = document.getElementById('cat-id').value;
+  const nombre = document.getElementById('cat-nombre').value.trim();
+  if (!nombre) return;
+
+  const cats = getCategorias();
+
+  if (id) {
+    // Editar
+    const idx = cats.findIndex(c => c.id === id);
+    if (idx >= 0) cats[idx].label = nombre;
+    mostrarToast('Categoria actualizada');
+  } else {
+    // Nueva: generar id unico desde el nombre
+    const idNuevo = 'cat-' + nombre.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      + '-' + Date.now().toString(36).slice(-4);
+
+    if (cats.some(c => c.label.toLowerCase() === nombre.toLowerCase())) {
+      mostrarToast('Ya existe una categoria con ese nombre', 'error');
+      return;
+    }
+    cats.push({ id: idNuevo, label: nombre });
+    mostrarToast('Categoria creada');
+  }
+
+  saveCategorias(cats);
+  cerrarModalCategoria();
+  renderCategoriasAdmin();
+  actualizarSelectCategorias();
+}
+
+function eliminarCategoria(id) {
+  const cat = getCategorias().find(c => c.id === id);
+  if (!cat) return;
+  const count = getProductos().filter(p => p.categoria === id).length;
+  const msg = count > 0
+    ? 'La categoria "' + cat.label + '" tiene ' + count + ' producto(s). ¿Eliminar de todas formas? Los productos quedaran sin categoria.'
+    : 'Eliminar la categoria "' + cat.label + '"?';
+  if (!confirm(msg)) return;
+
+  saveCategorias(getCategorias().filter(c => c.id !== id));
+  renderCategoriasAdmin();
+  actualizarSelectCategorias();
+  mostrarToast('Categoria eliminada');
+}
+
+function actualizarSelectCategorias() {
+  const cats = getCategorias();
+  // Modal producto
+  const selNP = document.getElementById('np-categoria');
+  if (selNP) {
+    const actual = selNP.value;
+    selNP.innerHTML = cats.map(c => '<option value="' + c.id + '">' + c.label + '</option>').join('');
+    if (cats.some(c => c.id === actual)) selNP.value = actual;
+  }
+  // Filtro catalogo
+  const selFiltro = document.getElementById('filtro-categoria-productos');
+  if (selFiltro) {
+    const actual = selFiltro.value;
+    selFiltro.innerHTML = '<option value="todos">Todas las categorias</option>' +
+      cats.map(c => '<option value="' + c.id + '">' + c.label + '</option>').join('');
+    selFiltro.value = actual;
+  }
+}
+
+/* ============ EDITOR DEL HOME ============ */
+const HOME_DEFAULT = {
+  hero: {
+    badge: '#1 en decoracion infantil',
+    titulo: 'Creamos espacios magicos para tu bebe',
+    subtitulo: 'Nombres en acrilico, cuadros, adhesivos y papel tapiz disenados con amor para que cada habitacion cuente su propia historia.',
+    imagen: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=900&q=80',
+    stats: [
+      { num: '+500', label: 'Habitaciones' },
+      { num: '100%', label: 'Personalizado' },
+      { num: '5 estrellas', label: 'Clientes felices' }
+    ]
+  },
+  servicios: {
+    tagline: 'Nuestros servicios',
+    titulo: 'Todo para su mundo',
+    descripcion: 'Cada pieza es disenada y fabricada pensando en la magia de la infancia.',
+    items: [
+      { icono: '*', titulo: 'Nombres acrilicos', descripcion: 'Letras con acabados premium, brillos y detalles unicos.' },
+      { icono: '#', titulo: 'Cuadros decorativos', descripcion: 'Con el significado del nombre y diseno personalizado.' },
+      { icono: '+', titulo: 'Adhesivos vinilicos', descripcion: 'Tematicas espaciales, marinas, animales y mas.' },
+      { icono: '@', titulo: 'Habitaciones completas', descripcion: 'Diseno integral: mural, papel tapiz y decoracion.' }
+    ]
+  },
+  pasos: {
+    tagline: 'Asi de facil',
+    titulo: 'Cotiza en 3 pasos',
+    items: [
+      { titulo: 'Elige tus productos', descripcion: 'Explora el catalogo y anade a tu cotizacion lo que mas te guste.' },
+      { titulo: 'Completa tus datos', descripcion: 'Nombre, cedula y telefono. Todo seguro, sin pagos online.' },
+      { titulo: 'Te contactamos', descripcion: 'Recibimos tu pedido por WhatsApp y coordinamos tu cotizacion personalizada.' }
+    ]
+  },
+  cta: {
+    titulo: 'Listos para empezar?',
+    subtitulo: 'Cada habitacion merece una historia unica. Cuentanos tu idea y la hacemos realidad.',
+    boton: 'Explorar catalogo'
+  },
+  footer: {
+    descripcion: 'Decoracion infantil personalizada. Creamos espacios magicos para los mas pequenos de la casa.',
+    ubicacion: 'Los palos grandes - Venezuela',
+    telefono: '+58 412-8048173'
+  }
+};
+
+function getHomeConfig() {
+  const raw = localStorage.getItem('chipilines_home_v2');
+  if (raw) {
+    try { return JSON.parse(raw); } catch(e) {}
+  }
+  return JSON.parse(JSON.stringify(HOME_DEFAULT));
+}
+
+function saveHomeConfig(cfg) {
+  localStorage.setItem('chipilines_home_v2', JSON.stringify(cfg));
+}
+
+function cargarHomeEditor() {
+  const cfg = getHomeConfig();
+  // Hero
+  const el = (id) => document.getElementById(id);
+  if (el('home-hero-badge')) el('home-hero-badge').value = cfg.hero.badge || '';
+  if (el('home-hero-titulo')) el('home-hero-titulo').value = cfg.hero.titulo || '';
+  if (el('home-hero-subtitulo')) el('home-hero-subtitulo').value = cfg.hero.subtitulo || '';
+  if (cfg.hero.imagen) {
+    window.__imgHomeHero = cfg.hero.imagen;
+    setTimeout(() => pintarPreviewUpload('home-hero-upload', cfg.hero.imagen), 100);
+  }
+  (cfg.hero.stats || []).forEach((s, i) => {
+    if (el('home-stat-' + (i+1) + '-num')) el('home-stat-' + (i+1) + '-num').value = s.num || '';
+    if (el('home-stat-' + (i+1) + '-label')) el('home-stat-' + (i+1) + '-label').value = s.label || '';
+  });
+  // Servicios
+  if (el('home-serv-tagline')) el('home-serv-tagline').value = cfg.servicios.tagline || '';
+  if (el('home-serv-titulo')) el('home-serv-titulo').value = cfg.servicios.titulo || '';
+  if (el('home-serv-desc')) el('home-serv-desc').value = cfg.servicios.descripcion || '';
+  (cfg.servicios.items || []).forEach((it, i) => {
+    const n = i + 1;
+    if (el('home-serv-' + n + '-icono')) el('home-serv-' + n + '-icono').value = it.icono || '';
+    if (el('home-serv-' + n + '-titulo')) el('home-serv-' + n + '-titulo').value = it.titulo || '';
+    if (el('home-serv-' + n + '-desc')) el('home-serv-' + n + '-desc').value = it.descripcion || '';
+  });
+  // Pasos
+  if (el('home-pasos-tagline')) el('home-pasos-tagline').value = cfg.pasos.tagline || '';
+  if (el('home-pasos-titulo')) el('home-pasos-titulo').value = cfg.pasos.titulo || '';
+  (cfg.pasos.items || []).forEach((it, i) => {
+    const n = i + 1;
+    if (el('home-paso-' + n + '-titulo')) el('home-paso-' + n + '-titulo').value = it.titulo || '';
+    if (el('home-paso-' + n + '-desc')) el('home-paso-' + n + '-desc').value = it.descripcion || '';
+  });
+  // CTA
+  if (el('home-cta-titulo')) el('home-cta-titulo').value = cfg.cta.titulo || '';
+  if (el('home-cta-subtitulo')) el('home-cta-subtitulo').value = cfg.cta.subtitulo || '';
+  if (el('home-cta-boton')) el('home-cta-boton').value = cfg.cta.boton || '';
+  // Footer
+  if (el('home-footer-desc')) el('home-footer-desc').value = cfg.footer.descripcion || '';
+  if (el('home-footer-ubicacion')) el('home-footer-ubicacion').value = cfg.footer.ubicacion || '';
+  if (el('home-footer-telefono')) el('home-footer-telefono').value = cfg.footer.telefono || '';
+}
+
+function recolectarHome() {
+  const el = (id) => document.getElementById(id);
+  const val = (id) => (el(id) ? el(id).value : '');
+  const cfg = {
+    hero: {
+      badge: val('home-hero-badge'),
+      titulo: val('home-hero-titulo'),
+      subtitulo: val('home-hero-subtitulo'),
+      imagen: window.__imgHomeHero || '',
+      stats: [
+        { num: val('home-stat-1-num'), label: val('home-stat-1-label') },
+        { num: val('home-stat-2-num'), label: val('home-stat-2-label') },
+        { num: val('home-stat-3-num'), label: val('home-stat-3-label') }
+      ]
+    },
+    servicios: {
+      tagline: val('home-serv-tagline'),
+      titulo: val('home-serv-titulo'),
+      descripcion: val('home-serv-desc'),
+      items: [1,2,3,4].map(n => ({
+        icono: val('home-serv-' + n + '-icono'),
+        titulo: val('home-serv-' + n + '-titulo'),
+        descripcion: val('home-serv-' + n + '-desc')
+      }))
+    },
+    pasos: {
+      tagline: val('home-pasos-tagline'),
+      titulo: val('home-pasos-titulo'),
+      items: [1,2,3].map(n => ({
+        titulo: val('home-paso-' + n + '-titulo'),
+        descripcion: val('home-paso-' + n + '-desc')
+      }))
+    },
+    cta: {
+      titulo: val('home-cta-titulo'),
+      subtitulo: val('home-cta-subtitulo'),
+      boton: val('home-cta-boton')
+    },
+    footer: {
+      descripcion: val('home-footer-desc'),
+      ubicacion: val('home-footer-ubicacion'),
+      telefono: val('home-footer-telefono')
+    }
+  };
+  return cfg;
+}
+
+function guardarTodoHome() {
+  const cfg = recolectarHome();
+  saveHomeConfig(cfg);
+  mostrarToast('Cambios guardados. Mira el preview!');
+}
+
+async function cargarImagenHomeHero(input) {
+  if (!input.files || !input.files[0]) return;
+  try {
+    mostrarToast('Procesando imagen...');
+    const dataUrl = await comprimirImagen(input.files[0], 1400, 0.82);
+    window.__imgHomeHero = dataUrl;
+    pintarPreviewUpload('home-hero-upload', dataUrl);
+    mostrarToast('Imagen lista');
+  } catch(e) { mostrarToast(e.message || 'Error al cargar', 'error'); }
+}
+
+function previewHome() {
+  // Guardar los cambios temporalmente para que el preview los muestre
+  const cfg = recolectarHome();
+  saveHomeConfig(cfg);
+  window.open('index.html?preview=1', '_blank');
+  mostrarToast('Vista previa abierta');
+}
